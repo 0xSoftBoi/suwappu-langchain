@@ -4,6 +4,15 @@ import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import type { BasePromptTemplate } from "@langchain/core/prompts";
 import { SuwappuToolkit } from "./toolkit.js";
 
+export function validateUserInput(input: string): string {
+  if (input.length > 500) throw new Error('Input too long (max 500 chars)');
+  const forbidden = ['ignore all', 'disregard', 'override', 'system prompt'];
+  for (const f of forbidden) {
+    if (input.toLowerCase().includes(f)) throw new Error('Potentially unsafe input detected');
+  }
+  return input;
+}
+
 export interface CreateSuwappuAgentConfig {
   apiKey: string;
   model: BaseLanguageModel;

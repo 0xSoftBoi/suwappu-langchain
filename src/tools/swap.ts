@@ -24,6 +24,13 @@ export class SuwappuGetQuoteTool extends Tool {
         });
       }
 
+      const MAX_TRADE_USD = parseFloat(process.env.SUWAPPU_MAX_TRADE_USD || '100');
+      if (Number(amount) > MAX_TRADE_USD) {
+        return JSON.stringify({
+          error: `Trade amount $${Number(amount)} exceeds MAX_TRADE_USD limit ($${MAX_TRADE_USD}). Set SUWAPPU_MAX_TRADE_USD to allow larger trades.`,
+        });
+      }
+
       const quote = await this.client.getQuote(
         from_token,
         to_token,
