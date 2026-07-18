@@ -18,7 +18,7 @@
   "author": "Suwappu",
   "license": "MIT",
   "dependencies": {
-    "@langchain/core": "^0.3.0",
+    "@langchain/core": "^1.2.3",
     "@suwappu/sdk": "^0.4.0",
     "langchain": "^0.3.0"
   },
