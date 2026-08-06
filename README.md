@@ -1,26 +1,25 @@
 # @suwappu/langchain-suwappu
 
-**LangChain toolkit for the [Suwappu](https://suwappu.bot) cross-chain DEX.**
+A safe-by-default LangChain toolkit for building agents on [Suwappu](https://suwappu.bot).
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue.svg)](https://www.typescriptlang.org)
-[![LangChain](https://img.shields.io/badge/LangChain-0.3-green.svg)](https://js.langchain.com)
+The toolkit gives LangChain and ReAct/LangGraph applications a small, explicit Suwappu tool surface for quotes, simulation, self-custody transaction preparation, portfolio/prices, and discovery. **Managed-wallet execution is excluded by default.**
 
-Drop-in LangChain toolkit with 6 DeFi tools for building AI trading agents. Works with any LangChain agent, LangGraph workflow, or custom chain. Swap tokens, check prices, view portfolios — across 14 chains.
+> Source status: this branch prepares the 0.2.x toolkit. npm currently serves 0.1.0 until the next package release.
 
----
+## Why the execution boundary is explicit
 
-## Features
+Prompt text is not a human-approval system. The default toolkit therefore cannot broadcast a managed-wallet swap.
 
-- **6 LangChain tools** — Quote, swap, portfolio, prices, chains, tokens
-- **SuwappuToolkit** — Single constructor returns all tools ready-to-use
-- **Pre-built agent** — `createSuwappuAgent()` gives you a working ReAct agent out of the box
-- **LangGraph ready** — Tools work with stateful LangGraph workflows
-- **14 chains** — Ethereum, Arbitrum, Base, Solana, and 10 more
+- `suwappu_get_quote` only gets a quote.
+- `suwappu_simulate_swap` dry-runs a quote and moves no funds.
+- `suwappu_prepare_swap` returns an unsigned self-custody transaction for the caller to review and sign.
+- `suwappu_execute_swap` can move funds through a Suwappu-managed wallet and only appears when the host sets `enableManagedExecution: true`.
 
----
+Use Suwappu wallet policies and an application-level approval flow in addition to model instructions.
 
 ## Install
+
+After the 0.2 package is published:
 
 ```bash
 npm install @suwappu/langchain-suwappu
@@ -28,106 +27,149 @@ npm install @suwappu/langchain-suwappu
 bun add @suwappu/langchain-suwappu
 ```
 
----
+For the pre-built OpenAI example, also install the model integration used by your app:
 
-## Quick Start
+```bash
+npm install @langchain/openai
+```
 
-### Use the Toolkit
+## Get a Suwappu API key
 
-```typescript
+```bash
+curl -X POST https://api.suwappu.bot/v1/agent/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-langchain-agent"}'
+```
+
+Store the returned `suwappu_sk_...` key securely:
+
+```bash
+export SUWAPPU_API_KEY=suwappu_sk_...
+```
+
+## Safe default toolkit
+
+```ts
 import { SuwappuToolkit } from "@suwappu/langchain-suwappu";
 
 const toolkit = new SuwappuToolkit({
   apiKey: process.env.SUWAPPU_API_KEY!,
 });
 
-// Get all 6 tools as LangChain Tool instances
 const tools = toolkit.getTools();
-
-// Use with any LangChain agent
-const agent = createOpenAIFunctionsAgent({ llm, tools, prompt });
+// Seven tools. No managed-wallet broadcast tool is present.
+console.log(tools.map((tool) => tool.name));
 ```
 
-### Use the Pre-Built Agent
+You can pass `tools` to a LangChain agent, a LangGraph node, or your own orchestration layer.
 
-```typescript
-import { createSuwappuAgent } from "@suwappu/langchain-suwappu";
+## Pre-built ReAct agent
+
+```ts
 import { ChatOpenAI } from "@langchain/openai";
+import { createSuwappuAgent } from "@suwappu/langchain-suwappu";
 
 const agent = await createSuwappuAgent({
   apiKey: process.env.SUWAPPU_API_KEY!,
-  model: new ChatOpenAI({ modelName: "gpt-4" }),
+  model: new ChatOpenAI({ model: "gpt-4.1-mini" }),
 });
 
 const result = await agent.invoke({
-  input: "Get a quote for swapping 1 ETH to USDC on Arbitrum",
+  input: "Quote 1 ETH to USDC on Arbitrum, then simulate it for wallet 0x...",
 });
 ```
 
-### Use Individual Tools
+The ReAct prompt is bundled locally, so creating an agent no longer depends on downloading `hwchase17/react` from LangChain Hub at runtime.
 
-```typescript
-import { SuwappuGetQuoteTool, SuwappuPortfolioTool } from "@suwappu/langchain-suwappu";
+## Tools
+
+| Tool | Input | Default | Moves funds? |
+|---|---|---:|---:|
+| `suwappu_get_quote` | `{"from_token","to_token","amount","chain"}` | Yes | No |
+| `suwappu_simulate_swap` | `{"quote_id","wallet_address"}` | Yes | No |
+| `suwappu_prepare_swap` | `{"quote_id","wallet_address"}` | Yes | No — unsigned |
+| `suwappu_get_portfolio` | `{"wallet_address","chain"?}` | Yes | No |
+| `suwappu_get_prices` | `"ETH,SOL"` or JSON | Yes | No |
+| `suwappu_list_chains` | empty string | Yes | No |
+| `suwappu_list_tokens` | chain name | Yes | No |
+| `suwappu_execute_swap` | `quote_id` | **No** | **Yes — managed wallet** |
+
+### Enable managed execution only after approval
+
+```ts
+import { SuwappuToolkit } from "@suwappu/langchain-suwappu";
+
+// Construct this toolset only inside your application's approved execution path.
+const approvedToolkit = new SuwappuToolkit({
+  apiKey: process.env.SUWAPPU_API_KEY!,
+  enableManagedExecution: true,
+});
+
+const liveTools = approvedToolkit.getTools();
+```
+
+Setting this flag is intentionally conspicuous. Do not flip it merely because the model says the user approved a trade; enforce approval in application state or a human-in-the-loop workflow.
+
+## Individual tools
+
+```ts
+import {
+  SuwappuGetQuoteTool,
+  SuwappuSimulateSwapTool,
+  SuwappuPrepareSwapTool,
+} from "@suwappu/langchain-suwappu";
 import { createClient } from "@suwappu/sdk";
 
 const client = createClient({ apiKey: process.env.SUWAPPU_API_KEY! });
-
 const quoteTool = new SuwappuGetQuoteTool(client);
-const portfolioTool = new SuwappuPortfolioTool(client);
+const simulateTool = new SuwappuSimulateSwapTool();
+const prepareTool = new SuwappuPrepareSwapTool();
 ```
 
----
+## SDK compatibility
 
-## Tools Reference
+The installable toolkit still depends on the published `@suwappu/sdk@0.4.x` for APIs whose stable contract matches production, such as quotes and chain/token discovery.
 
-| Tool | Name | Input | Output |
-|------|------|-------|--------|
-| `SuwappuGetQuoteTool` | `suwappu_get_quote` | JSON: `{ from_token, to_token, amount, chain }` | Quote with price, route, gas, fees |
-| `SuwappuExecuteSwapTool` | `suwappu_execute_swap` | `quote_id` string | Transaction hash and status |
-| `SuwappuPortfolioTool` | `suwappu_get_portfolio` | Optional `chain` string | Token balances with USD values |
-| `SuwappuPricesTool` | `suwappu_get_prices` | `token` string | USD price and 24h change |
-| `SuwappuChainsTool` | `suwappu_list_chains` | — | Supported chains and status |
-| `SuwappuTokensTool` | `suwappu_list_tokens` | `chain` string | Tokens with addresses and decimals |
+The `suwappubot` monorepo already contains newer 0.6.x SDK source for `swap()`, `prepareSwap()`, `simulateSwap()`, current prices/portfolio shapes, wallet lifecycle, policies, approvals, audit, and kill switches. Because 0.6.x is not yet published to npm, this toolkit uses a small `src/api.ts` bridge for those current production contracts instead of pretending npm users can import unpublished methods.
 
----
+Once the matching SDK is released, that bridge can collapse back into SDK calls without changing the LangChain tool semantics.
 
-## Architecture
+## Hosted MCP alternative
 
-```
-@suwappu/langchain-suwappu
-├── SuwappuToolkit          → Returns all 6 tools
-├── createSuwappuAgent()    → Pre-built ReAct agent
-└── Individual Tools
-    ├── SuwappuGetQuoteTool
-    ├── SuwappuExecuteSwapTool
-    ├── SuwappuPortfolioTool
-    ├── SuwappuPricesTool
-    ├── SuwappuChainsTool
-    └── SuwappuTokensTool
+If your LangChain stack already speaks MCP and you want Suwappu's broader tool surface (predictions, perps, lending, swap status/history, wallet policies, and more), connect to the hosted endpoint:
+
+```text
+https://api.suwappu.bot/mcp
 ```
 
----
+The dedicated LangChain toolkit remains useful when you want a deliberately smaller tool allowlist and an explicit execution gate.
 
-## Environment Variables
+## Environment variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `SUWAPPU_API_KEY` | Yes | Your Suwappu API key |
-| `OPENAI_API_KEY` | For agent | Required if using `createSuwappuAgent()` |
+| Variable | Required | Purpose |
+|---|---:|---|
+| `SUWAPPU_API_KEY` | Yes | Suwappu agent API key |
+| `SUWAPPU_WALLET_ADDRESS` | No | Compatibility fallback for legacy plain-chain portfolio input |
+| `SUWAPPU_MAX_INPUT_AMOUNT` | No | Quote-only raw input-unit ceiling; default 1,000,000 |
+| `OPENAI_API_KEY` | Model-specific | Needed only when your chosen model integration requires it |
 
----
+`SUWAPPU_MAX_INPUT_AMOUNT` is **not a USD risk control** because quote input units depend on the source token. Use wallet policies for real execution limits.
 
-## Get an API Key
+## Development
 
 ```bash
-curl -X POST https://api.suwappu.bot/v1/agent/register \
-  -H "Content-Type: application/json" \
-  -d '{"name": "my-langchain-agent"}'
+bun install --frozen-lockfile
+bun run typecheck
+bun test
 ```
 
-Free. No credit card. Returns `suwappu_sk_...` immediately.
+CI treats typecheck and tests as blocking quality gates.
 
----
+## Links
+
+- [Suwappu docs](https://docs.suwappu.bot)
+- [Hosted MCP endpoint](https://api.suwappu.bot/mcp)
+- [Suwappu SDK source](https://github.com/0xSoftBoi/suwappubot/tree/main/packages/sdk)
 
 ## License
 
