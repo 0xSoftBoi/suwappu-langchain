@@ -6,7 +6,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue.svg)](https://www.typescriptlang.org)
 [![LangChain](https://img.shields.io/badge/LangChain-0.3-green.svg)](https://js.langchain.com)
 
-Drop-in LangChain toolkit with 6 DeFi tools for building AI trading agents. Works with any LangChain agent, LangGraph workflow, or custom chain. Swap tokens, check prices, view portfolios — across 15 chains.
+Drop-in LangChain toolkit with 6 DeFi tools for building AI trading agents. Works with any LangChain agent, LangGraph workflow, or custom chain. Swap tokens, check prices, view portfolios — across 14 chains.
 
 ---
 
@@ -16,7 +16,7 @@ Drop-in LangChain toolkit with 6 DeFi tools for building AI trading agents. Work
 - **SuwappuToolkit** — Single constructor returns all tools ready-to-use
 - **Pre-built agent** — `createSuwappuAgent()` gives you a working ReAct agent out of the box
 - **LangGraph ready** — Tools work with stateful LangGraph workflows
-- **15 chains** — Ethereum, Arbitrum, Base, Solana, and 11 more
+- **14 chains** — Ethereum, Arbitrum, Base, Solana, and 10 more
 
 ---
 
