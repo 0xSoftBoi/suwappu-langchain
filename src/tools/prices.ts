@@ -1,37 +1,39 @@
 import { Tool } from "@langchain/core/tools";
 import type { SuwappuClient } from "@suwappu/sdk";
+import { SuwappuApi } from "../api.js";
 
 export class SuwappuPricesTool extends Tool {
   name = "suwappu_get_prices";
   description =
-    "Get current token prices in USD. Input: token symbol (e.g. \"ETH\", \"USDC\"). Optionally include chain as JSON: {\"token\": \"ETH\", \"chain\": \"arbitrum\"}.";
+    'Get current USD prices and 24h changes. Input: a symbol or comma-separated symbols (for example "ETH,SOL"), or JSON {"symbols":"ETH,SOL","chain":"base"}.';
 
-  private client: SuwappuClient;
+  private readonly api: SuwappuApi;
 
-  constructor(client: SuwappuClient) {
+  constructor(_client: SuwappuClient, api = new SuwappuApi()) {
     super();
-    this.client = client;
+    this.api = api;
   }
 
   async _call(input: string): Promise<string> {
     try {
-      let token: string;
+      let symbols = "";
       let chain: string | undefined;
 
       try {
-        const parsed = JSON.parse(input);
-        token = parsed.token;
+        const parsed = JSON.parse(input) as {
+          symbols?: string;
+          token?: string;
+          chain?: string;
+        };
+        symbols = parsed.symbols ?? parsed.token ?? "";
         chain = parsed.chain;
       } catch {
-        token = input.trim();
+        symbols = input.trim();
       }
 
-      if (!token) {
-        return JSON.stringify({ error: "Missing token symbol." });
-      }
+      if (!symbols) return JSON.stringify({ error: "Missing token symbol(s)." });
 
-      const prices = await this.client.getPrices(token, chain);
-      return JSON.stringify(prices);
+      return JSON.stringify(await this.api.getPrices(symbols, chain));
     } catch (error) {
       return JSON.stringify({
         error: `Failed to get prices: ${error instanceof Error ? error.message : String(error)}`,
