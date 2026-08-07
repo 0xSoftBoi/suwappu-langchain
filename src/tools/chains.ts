@@ -1,17 +1,25 @@
-import { Tool } from "@langchain/core/tools";
-import type { SuwappuClient } from "@suwappu/sdk";
+import { StructuredTool } from "@langchain/core/tools";
+import { z } from "zod";
+import { SuwappuApi } from "../api.js";
 
-export class SuwappuChainsTool extends Tool {
+const noInputSchema = z.object({});
+const tokensSchema = z.object({
+  chain: z.string().trim().min(1).optional().describe('Optional chain, for example "base" or "solana"'),
+  search: z.string().trim().min(1).optional().describe('Optional symbol substring, for example "USD"'),
+});
+
+export class SuwappuChainsTool extends StructuredTool<typeof noInputSchema> {
   name = "suwappu_list_chains";
   description = "List all supported blockchain chains. No input required.";
+  schema = noInputSchema;
 
-  constructor(private readonly client: SuwappuClient) {
+  constructor(private readonly api = new SuwappuApi()) {
     super();
   }
 
-  async _call(_input: string): Promise<string> {
+  async _call(_input: z.output<typeof noInputSchema>): Promise<string> {
     try {
-      return JSON.stringify(await this.client.listChains());
+      return JSON.stringify(await this.api.listChains());
     } catch (error) {
       return JSON.stringify({
         error: `Failed to list chains: ${error instanceof Error ? error.message : String(error)}`,
@@ -20,25 +28,19 @@ export class SuwappuChainsTool extends Tool {
   }
 }
 
-export class SuwappuTokensTool extends Tool {
+export class SuwappuTokensTool extends StructuredTool<typeof tokensSchema> {
   name = "suwappu_list_tokens";
   description =
-    'List available tokens for a chain. Input: chain name, for example "base" or "solana". The published SDK requires a chain.';
+    "List recognized tokens, optionally filtered by chain and/or symbol substring.";
+  schema = tokensSchema;
 
-  constructor(private readonly client: SuwappuClient) {
+  constructor(private readonly api = new SuwappuApi()) {
     super();
   }
 
-  async _call(input: string): Promise<string> {
-    const chain = input.trim();
-    if (!chain) {
-      return JSON.stringify({
-        error: 'Missing chain. Pass a chain name such as "base" or call suwappu_list_chains first.',
-      });
-    }
-
+  async _call(input: z.output<typeof tokensSchema>): Promise<string> {
     try {
-      return JSON.stringify(await this.client.listTokens(chain));
+      return JSON.stringify(await this.api.listTokens(input));
     } catch (error) {
       return JSON.stringify({
         error: `Failed to list tokens: ${error instanceof Error ? error.message : String(error)}`,
