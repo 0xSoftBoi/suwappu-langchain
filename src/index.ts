@@ -4,7 +4,17 @@ export {
   isValidIdempotencyKey,
   SuwappuApi,
   SuwappuApiError,
+  SuwappuProtocolError,
+  SuwappuTransportError,
+  type SuwappuApiEvent,
+  type SuwappuApiEventHandler,
+  type SuwappuApiEventOutcome,
   type SuwappuApiConfig,
+  type SuwappuManagedSwapResponse,
+  type SuwappuQuoteResponse,
+  type SuwappuSimulationResponse,
+  type SuwappuSwapHistoryResponse,
+  type SuwappuSwapStatusResponse,
 } from "./api.js";
 
 export {

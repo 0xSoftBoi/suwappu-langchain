@@ -229,8 +229,14 @@ Before taking money for the product, verify:
 - paper/live use the same decision path;
 - customer revenue and strategy P&L are separate ledgers;
 - package and Agent API versions are observable in deployments;
+- every outbound API call has a bounded deadline and typed failure classification;
+- request metadata feeds metrics/tracing without exposing credentials or request bodies;
+- tenant-aware rate limiting reserves capacity for reconciliation traffic;
+- model/tool regression evaluations gate model, prompt, and tool-surface changes;
 - you have a way to stop unattended execution quickly.
 
 For policy, audit, billing, key management, webhooks, and kill-switch APIs beyond this deliberately small adapter, use the main [`@suwappu/sdk`](https://github.com/0xSoftBoi/suwappubot/tree/main/packages/sdk) or REST API. The full documentation starts at [suwappu.bot/docs](https://suwappu.bot/docs).
+
+The deployment/runbook details live in [Production Operations](OPERATIONS.md).
 
 > This is product/engineering guidance, not a guarantee of returns or legal/compliance advice. Financial-advice, custody, or regulated-user products may create obligations beyond the technical controls described here.

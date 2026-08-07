@@ -1,5 +1,5 @@
 import type { StructuredToolInterface } from "@langchain/core/tools";
-import { SuwappuApi } from "./api.js";
+import { SuwappuApi, type SuwappuApiEventHandler } from "./api.js";
 import {
   type ManagedExecutionApproval,
   SuwappuGetQuoteTool,
@@ -15,6 +15,12 @@ import { SuwappuSwapHistoryTool, SuwappuSwapStatusTool } from "./tools/status.js
 export interface SuwappuToolkitConfig {
   apiKey: string;
   baseUrl?: string;
+  /** Per-request timeout. Defaults to 30 seconds. */
+  requestTimeoutMs?: number;
+  /** Optional custom fetch implementation for proxies, service meshes, or deterministic tests. */
+  fetch?: typeof globalThis.fetch;
+  /** Metadata-only hook for metrics/tracing. Never receives auth headers or request bodies. */
+  onApiEvent?: SuwappuApiEventHandler;
   /**
    * Adds the destructive managed-wallet execution tool.
    * Defaults to false. Only enable after your application has its own
@@ -37,6 +43,9 @@ export class SuwappuToolkit {
   constructor({
     apiKey,
     baseUrl,
+    requestTimeoutMs,
+    fetch,
+    onApiEvent,
     enableManagedExecution = false,
     approveManagedExecution,
   }: SuwappuToolkitConfig) {
@@ -45,7 +54,13 @@ export class SuwappuToolkit {
         "approveManagedExecution is required when enableManagedExecution is true",
       );
     }
-    this.api = new SuwappuApi({ apiKey, baseUrl });
+    this.api = new SuwappuApi({
+      apiKey,
+      baseUrl,
+      timeoutMs: requestTimeoutMs,
+      fetch,
+      onEvent: onApiEvent,
+    });
     this.enableManagedExecution = enableManagedExecution;
     this.approveManagedExecution = approveManagedExecution;
   }

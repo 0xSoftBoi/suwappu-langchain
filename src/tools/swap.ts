@@ -2,16 +2,42 @@ import { StructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import { isValidIdempotencyKey, SuwappuApi, SuwappuApiError } from "../api.js";
 
-const quoteSchema = z.object({
-  from_token: z.string().trim().min(1).describe("Source token symbol or address"),
-  to_token: z.string().trim().min(1).describe("Destination token symbol or address"),
-  amount: z.number().positive().describe("Amount in source-token units"),
-  chain: z.string().trim().min(1).optional().describe("Same-chain key, for example base or solana"),
-  from_chain: z.string().trim().min(1).optional().describe("Cross-chain source chain"),
-  to_chain: z.string().trim().min(1).optional().describe("Cross-chain destination chain"),
-  wallet_address: z.string().trim().min(1).optional().describe("Wallet to bind transaction data to"),
-  slippage: z.number().min(0).max(0.5).optional().describe("Slippage tolerance as a decimal"),
-});
+const quoteSchema = z
+  .object({
+    from_token: z.string().trim().min(1).describe("Source token symbol or address"),
+    to_token: z.string().trim().min(1).describe("Destination token symbol or address"),
+    amount: z.number().positive().describe("Amount in source-token units"),
+    chain: z.string().trim().min(1).optional().describe("Same-chain key, for example base or solana"),
+    from_chain: z.string().trim().min(1).optional().describe("Cross-chain source chain"),
+    to_chain: z.string().trim().min(1).optional().describe("Cross-chain destination chain"),
+    wallet_address: z.string().trim().min(1).optional().describe("Wallet to bind transaction data to"),
+    slippage: z.number().min(0).max(0.5).optional().describe("Slippage tolerance as a decimal"),
+  })
+  .superRefine((input, context) => {
+    const hasSameChain = Boolean(input.chain);
+    const hasFromChain = Boolean(input.from_chain);
+    const hasToChain = Boolean(input.to_chain);
+    const hasCrossChain = hasFromChain || hasToChain;
+
+    if (!hasSameChain && !(hasFromChain && hasToChain)) {
+      context.addIssue({
+        code: "custom",
+        message: "Provide chain for a same-chain quote, or both from_chain and to_chain for a cross-chain quote.",
+      });
+    }
+    if (hasCrossChain && !(hasFromChain && hasToChain)) {
+      context.addIssue({
+        code: "custom",
+        message: "Cross-chain quotes require both from_chain and to_chain.",
+      });
+    }
+    if (hasSameChain && hasCrossChain) {
+      context.addIssue({
+        code: "custom",
+        message: "Use either chain or the from_chain/to_chain pair, not both.",
+      });
+    }
+  });
 
 const quoteAndWalletSchema = z.object({
   quote_id: z.string().trim().min(1).describe("Fresh Suwappu quote id"),
@@ -172,7 +198,7 @@ export class SuwappuExecuteSwapTool extends StructuredTool<typeof executeSchema>
       );
     } catch (error) {
       const outcomeUnknown =
-        !(error instanceof SuwappuApiError) || error.status >= 500;
+        !(error instanceof SuwappuApiError) || error.status === 408 || error.status >= 500;
       return JSON.stringify({
         error: `Failed to execute managed swap: ${error instanceof Error ? error.message : String(error)}`,
         outcome: outcomeUnknown ? "unknown" : "rejected",
