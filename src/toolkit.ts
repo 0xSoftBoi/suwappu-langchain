@@ -1,7 +1,7 @@
-import { Tool } from "@langchain/core/tools";
-import { createClient, type SuwappuClient } from "@suwappu/sdk";
+import type { StructuredToolInterface } from "@langchain/core/tools";
 import { SuwappuApi } from "./api.js";
 import {
+  type ManagedExecutionApproval,
   SuwappuGetQuoteTool,
   SuwappuExecuteSwapTool,
   SuwappuPrepareSwapTool,
@@ -10,6 +10,7 @@ import {
 import { SuwappuPortfolioTool } from "./tools/portfolio.js";
 import { SuwappuPricesTool } from "./tools/prices.js";
 import { SuwappuChainsTool, SuwappuTokensTool } from "./tools/chains.js";
+import { SuwappuSwapHistoryTool, SuwappuSwapStatusTool } from "./tools/status.js";
 
 export interface SuwappuToolkitConfig {
   apiKey: string;
@@ -20,36 +21,50 @@ export interface SuwappuToolkitConfig {
    * human/policy approval boundary.
    */
   enableManagedExecution?: boolean;
+  /**
+   * Host-controlled authorization boundary for each managed execution.
+   * Required when enableManagedExecution is true. Return a durable intent key
+   * persisted by your application; never derive it from the current time.
+   */
+  approveManagedExecution?: ManagedExecutionApproval;
 }
 
 export class SuwappuToolkit {
-  private readonly client: SuwappuClient;
   private readonly api: SuwappuApi;
   private readonly enableManagedExecution: boolean;
+  private readonly approveManagedExecution?: ManagedExecutionApproval;
 
   constructor({
     apiKey,
     baseUrl,
     enableManagedExecution = false,
+    approveManagedExecution,
   }: SuwappuToolkitConfig) {
-    this.client = createClient({ apiKey, baseUrl });
+    if (enableManagedExecution && !approveManagedExecution) {
+      throw new Error(
+        "approveManagedExecution is required when enableManagedExecution is true",
+      );
+    }
     this.api = new SuwappuApi({ apiKey, baseUrl });
     this.enableManagedExecution = enableManagedExecution;
+    this.approveManagedExecution = approveManagedExecution;
   }
 
-  getTools(): Tool[] {
-    const tools: Tool[] = [
-      new SuwappuGetQuoteTool(this.client),
+  getTools(): StructuredToolInterface[] {
+    const tools: StructuredToolInterface[] = [
+      new SuwappuGetQuoteTool(this.api),
       new SuwappuSimulateSwapTool(this.api),
       new SuwappuPrepareSwapTool(this.api),
-      new SuwappuPortfolioTool(this.client, this.api),
-      new SuwappuPricesTool(this.client, this.api),
-      new SuwappuChainsTool(this.client),
-      new SuwappuTokensTool(this.client),
+      new SuwappuPortfolioTool(this.api),
+      new SuwappuPricesTool(this.api),
+      new SuwappuChainsTool(this.api),
+      new SuwappuTokensTool(this.api),
+      new SuwappuSwapStatusTool(this.api),
+      new SuwappuSwapHistoryTool(this.api),
     ];
 
-    if (this.enableManagedExecution) {
-      tools.push(new SuwappuExecuteSwapTool(this.client, this.api));
+    if (this.enableManagedExecution && this.approveManagedExecution) {
+      tools.push(new SuwappuExecuteSwapTool(this.api, this.approveManagedExecution));
     }
 
     return tools;
