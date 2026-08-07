@@ -1,19 +1,9 @@
 import { createAgent } from "langchain";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import type { ManagedExecutionApproval } from "./tools/swap.js";
-import { SuwappuToolkit } from "./toolkit.js";
+import { SuwappuToolkit, type SuwappuToolkitConfig } from "./toolkit.js";
 
-export interface CreateSuwappuAgentConfig {
-  apiKey: string;
+export interface CreateSuwappuAgentConfig extends SuwappuToolkitConfig {
   model: string | BaseChatModel;
-  baseUrl?: string;
-  /**
-   * Exposes a managed-wallet tool that can broadcast transactions.
-   * Defaults to false. Prompt text is not an approval boundary: only enable
-   * this after the host application has implemented human/policy approval.
-   */
-  enableManagedExecution?: boolean;
-  approveManagedExecution?: ManagedExecutionApproval;
 }
 
 const SYSTEM_PROMPT = `You are a Suwappu assistant for quotes, prices, portfolios, supported assets, simulations, and transaction preparation.
@@ -29,19 +19,9 @@ Safety and tool semantics:
 - Never fabricate balances, routes, transaction hashes, or execution status.
 - If a chain, token, wallet address, or quote id is missing, ask for it or use the discovery tools.`;
 
-export async function createSuwappuAgent({
-  apiKey,
-  model,
-  baseUrl,
-  enableManagedExecution = false,
-  approveManagedExecution,
-}: CreateSuwappuAgentConfig) {
-  const toolkit = new SuwappuToolkit({
-    apiKey,
-    baseUrl,
-    enableManagedExecution,
-    approveManagedExecution,
-  });
+export async function createSuwappuAgent(config: CreateSuwappuAgentConfig) {
+  const { model, ...toolkitConfig } = config;
+  const toolkit = new SuwappuToolkit(toolkitConfig);
   const tools = toolkit.getTools();
 
   return createAgent({

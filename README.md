@@ -161,6 +161,34 @@ The package publishes compiled ESM and declarations from `dist/`; consumers do n
 
 The Suwappu API bridge in this package is deliberately small and versioned with the adapter. You can use the broader [`@suwappu/sdk`](https://github.com/0xSoftBoi/suwappubot/tree/main/packages/sdk) alongside it for account, billing, policy, approval, audit, and kill-switch APIs.
 
+## Enterprise runtime controls
+
+The adapter is designed to sit inside your existing control plane instead of hiding production behavior:
+
+```ts
+const toolkit = new SuwappuToolkit({
+  apiKey: process.env.SUWAPPU_API_KEY!,
+  requestTimeoutMs: 15_000,
+  onApiEvent(event) {
+    metrics.observe("suwappu_api", event.durationMs, {
+      path: event.path,
+      outcome: event.outcome,
+      status: event.status,
+    });
+  },
+});
+```
+
+- requests have a finite 30-second default deadline;
+- `SuwappuApiError`, `SuwappuTransportError`, and `SuwappuProtocolError` distinguish HTTP, timeout/network, and malformed-success failures;
+- HTTP errors preserve API error code, request/correlation id, and `Retry-After` as `retryAfterMs` when available;
+- quote, simulation, managed execution, status, and history enforce minimal response contracts at runtime instead of trusting any JSON-shaped 200 response;
+- telemetry emits metadata only and cannot see credentials/request bodies;
+- the package never applies a generic automatic retry policy—especially not around money-moving execution;
+- a custom `fetch` can integrate a service mesh, egress proxy, or tracing layer.
+
+Read [Production Operations](docs/OPERATIONS.md) for multi-tenant boundaries, retry policy, metrics/SLOs, capacity, evaluation gates, secrets, deployment discipline, and the live-incident runbook.
+
 ## Development
 
 ```bash
@@ -174,6 +202,7 @@ npm run verify
 
 - [Suwappu docs](https://suwappu.bot/docs)
 - [Build a Business on Suwappu](https://suwappu.bot/docs/guides/build-a-business)
+- [Production operations](docs/OPERATIONS.md)
 - [Hosted MCP](https://api.suwappu.bot/mcp)
 - [Suwappu SDK source](https://github.com/0xSoftBoi/suwappubot/tree/main/packages/sdk)
 - [Security policy](SECURITY.md)

@@ -22,6 +22,7 @@ try {
     "dist/index.d.ts",
     "README.md",
     "docs/BUILD_A_LANGCHAIN_PRODUCT.md",
+    "docs/OPERATIONS.md",
     "LICENSE",
   ]) {
     if (!paths.has(required)) throw new Error(`npm package is missing ${required}`);

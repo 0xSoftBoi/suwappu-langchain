@@ -1,9 +1,10 @@
 # Security Policy
 
-This repository is a satellite / example application built on the
-[Suwappu API](https://github.com/0xSoftBoi/suwappubot). Some examples can
-initiate real financial transactions when execution is enabled. Treat API keys,
-wallet credentials, and configuration as sensitive.
+This repository is the standalone LangChain integration for the
+[Suwappu Agent API](https://github.com/0xSoftBoi/suwappubot). Its default toolset
+cannot broadcast managed-wallet transactions. Hosts can explicitly enable a
+money-moving execution tool, so treat the package, API keys, approval state,
+and application configuration as security-sensitive.
 
 ## Reporting a vulnerability
 
@@ -23,10 +24,29 @@ upstream through the
 
 ## Custody and execution model
 
-Suwappu supports both self-custody and custodial product flows. This satellite
-repository does not make a custody guarantee: behavior depends on the API mode
-and configuration in use. Prefer dry-run or read-only modes where available,
-use test wallets before enabling execution, and never commit credentials.
+The default toolkit exposes read, quote, simulation, unsigned self-custody
+preparation, and managed-swap reconciliation only. `suwappu_execute_swap` is
+added only when the host sets `enableManagedExecution: true` and supplies an
+`approveManagedExecution` callback. That callback executes in host application
+code and must return a durable idempotency key.
+
+Prompt text is not an approval boundary. A model must not be able to create or
+modify the database state that the approval callback trusts without a separate
+authorization control.
+
+For a transport/timeout/5xx failure during managed execution, treat the outcome
+as unknown and reconcile managed swap records before any retry. Do not place a
+generic retry wrapper around the execution tool.
+
+## Secret and telemetry boundary
+
+- Never expose `SUWAPPU_API_KEY` in model-visible state, prompts, client-side bundles, logs, or analytics.
+- The `onApiEvent` callback receives request metadata only; the adapter does not put authorization headers or request bodies in those events.
+- A custom `fetch` implementation is part of the trusted computing base. Review any proxy/tracing wrapper for header/body logging before production use.
+- Keep development, staging, and production credentials separate and rotate on suspected exposure.
+
+See [Production Operations](docs/OPERATIONS.md) for tenancy, observability,
+rate-limit, deployment, and incident-response guidance.
 
 ## Our commitment
 
