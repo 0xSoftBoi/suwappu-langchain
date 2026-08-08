@@ -31,3 +31,17 @@ jobs:
         run: npm ci
       - name: Verify source, behavior, build, and packed consumer
         run: npm run verify
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependency graph
+        run: npm ci
+      - name: Block high and critical dependency advisories
+        run: npm audit --audit-level=high
