@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add a blocking high/critical dependency audit to CI.
+- Add CodeQL analysis for the JavaScript/TypeScript adapter.
+- Document contributor release gates and non-negotiable authority/idempotency invariants.
+
 ## 0.2.0
 
 - Move the adapter to LangChain 1.x `createAgent` and schema-defined tools.
