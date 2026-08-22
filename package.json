@@ -44,11 +44,11 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "@langchain/core": "^1.2.5",
+    "@langchain/core": "^1.2.8",
     "langchain": "^1.5.5"
   },
   "devDependencies": {
-    "@langchain/core": "^1.2.5",
+    "@langchain/core": "^1.2.8",
     "@types/node": "^24.10.0",
     "langchain": "^1.5.5",
     "tsx": "^4.20.6",
